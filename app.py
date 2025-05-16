@@ -1,40 +1,52 @@
 import streamlit as st
 import plotly.graph_objects as go
 import pandas as pd
+from datetime import date, timedelta
 
 st.set_page_config(page_title="Wealth Ultima Illustration", layout="wide")
 
+today_minus_1 = date.today() - timedelta(days=1)
+state_options = [
+    "Premium Paying (During Lock-in)",
+    "Premium Paying (Post Lock-in)",
+    "Discontinuance Within Lock-in",
+    "Paid Up",
+    "Discontinuance Pending",
+    "Discontinuance within Lock-in & wants to revive",
+    "Discontinuance after lock in"
+]
+
 st.title("🧮 Wealth Ultima Discontinuance Illustration Tool")
 
-# Sidebar inputs
 st.sidebar.header("Policy Input Details")
 
 annual_premium = st.sidebar.number_input("Annualised Premium (₹)", min_value=10000, step=1000)
 policy_term = st.sidebar.selectbox("Policy Term (in years)", list(range(10, 31)))
 ppt = st.sidebar.selectbox("Premium Paying Term", list(range(5, policy_term + 1)))
 mode = st.sidebar.selectbox("Premium Payment Mode", ["Annual", "Half-Yearly", "Quarterly", "Monthly"])
-state = st.sidebar.text_input("State of Policy (e.g. Discontinued)")
+
+typed_state = st.sidebar.text_input("Start typing State of Policy").strip()
+matching_states = [s for s in state_options if typed_state.lower() in s.lower()] if len(typed_state) >= 3 else []
+state_selected = st.sidebar.selectbox("Select State of Policy", matching_states if matching_states else ["Type 3+ letters above..."])
+
 issuance_date = st.sidebar.date_input("Policy Issuance Date")
 latest_dfv = st.sidebar.number_input("Latest Discontinuance Fund Value (₹)", step=1000.0)
-dfv_date = st.sidebar.date_input("Date of Latest DFV")
 units = st.sidebar.number_input("Units in Discontinuance Fund", step=0.01)
 
-st.sidebar.header("Fund Allocation (Total = 100%)")
-allocations = {
-    "Equity Large Cap": st.sidebar.slider("Equity Large Cap (%)", 0, 100, 0),
-    "Top 250 Fund": st.sidebar.slider("Top 250 Fund (%)", 0, 100, 0),
-    "Bond Fund": st.sidebar.slider("Bond Fund (%)", 0, 100, 100),
-    "Equity Mid Cap": st.sidebar.slider("Equity Mid Cap (%)", 0, 100, 0),
-    "Managed Fund": st.sidebar.slider("Managed Fund (%)", 0, 100, 0),
-    "Equity Blue Chip": st.sidebar.slider("Equity Blue Chip (%)", 0, 100, 0),
-    "GILT Fund": st.sidebar.slider("GILT Fund (%)", 0, 100, 0),
-}
+st.sidebar.markdown("### Fund Allocation (Total = 100%)")
+alloc_df = pd.DataFrame({
+    "Fund": [
+        "Equity Large Cap", "Top 250 Fund", "Bond Fund", "Equity Mid Cap",
+        "Managed Fund", "Equity Blue Chip", "GILT Fund"
+    ],
+    "Allocation %": [0, 0, 100, 0, 0, 0, 0]
+})
+edited_df = st.sidebar.data_editor(alloc_df, num_rows="fixed")
+total_alloc = edited_df["Allocation %"].sum()
+if total_alloc != 100:
+    st.sidebar.error(f"Allocation total = {total_alloc}%. Must be exactly 100%.")
 
-if sum(allocations.values()) != 100:
-    st.sidebar.warning("⚠️ Allocation must total 100%")
-
-# Submit button
-if st.sidebar.button("Generate Illustration") and sum(allocations.values()) == 100:
+if st.sidebar.button("Generate Illustration") and total_alloc == 100:
     st.success("📊 Showing Results Based on Your Inputs")
 
     st.subheader("🔍 Policy Summary")
@@ -44,17 +56,19 @@ if st.sidebar.button("Generate Illustration") and sum(allocations.values()) == 1
         st.markdown(f"**Policy Term:** {policy_term} years")
         st.markdown(f"**Premium Paying Term:** {ppt} years")
         st.markdown(f"**Payment Mode:** {mode}")
+        st.markdown(f"**Issuance Date:** {issuance_date}")
     with col2:
-        st.markdown(f"**Discontinuance FV:** ₹{latest_dfv:,.0f} (as of {dfv_date})")
+        st.markdown(f"**Latest DFV:** ₹{latest_dfv:,.0f} (as of {today_minus_1})")
         st.markdown(f"**Units in DF:** {units}")
-        st.markdown(f"**Fund Allocation:**")
-        for name, pct in allocations.items():
-            st.markdown(f"- {name}: {pct}%")
+        st.markdown(f"**State of Policy:** {state_selected}")
+
+    st.markdown("#### Fund Allocation")
+    st.dataframe(edited_df, use_container_width=True)
 
     st.divider()
     st.subheader("📜 Personalized Narrative")
-    st.markdown(f"Your policy was valued at **₹9,18,303** when it moved into the Discontinuance Fund. "
-                f"If you had continued, your fund could have grown to **₹13,97,023** by now.")
+    st.markdown("Your policy was valued at **₹9,18,303** when it moved into the Discontinuance Fund. "
+                "If you had continued, your fund could have grown to **₹13,97,023** by now.")
 
     st.divider()
     st.subheader("📈 Graphs")
@@ -94,5 +108,3 @@ if st.sidebar.button("Generate Illustration") and sum(allocations.values()) == 1
     fig5 = go.Figure([go.Bar(x=years, y=charges)])
     fig5.update_layout(title="ULIP Charges as % of FV", yaxis_tickformat=".2%")
     st.plotly_chart(fig5, use_container_width=True)
-
-    st.info("📌 All illustrations & projections are illustrative and for internal decision support only.")
