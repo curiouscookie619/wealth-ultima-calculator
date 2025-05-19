@@ -1,3 +1,2 @@
-# Wealth Ultima Illustration App
-
-Streamlit-based tool with improved UX and logic.
+# Wealth Ultima with PDF Download
+Includes HTML-based professional PDF output.
